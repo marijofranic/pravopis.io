@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+<html lang="hr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pravopis.io — hrvatski asistent za pisanje</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=Fragment+Mono&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* Co-Star sustav — crno/bijelo; kategorije razlikuju sivina + stil linije, ne boja */
+  --zelena-600:#0A0A0A; --zelena-700:#000000; --zelena-100:#F0F0F0; --zelena-50:#FAFAFA;
+  --tocnost:#000000;      --tocnost-bg:rgba(0,0,0,.07);    /* pravopis — solid, najtamnije */
+  --jasnoca:#454545;      --jasnoca-bg:rgba(0,0,0,.055);   /* stil — dashed */
+  --zanimljivost:#7A7A7A; --zanimljivost-bg:rgba(0,0,0,.04); /* zanimljivost — dotted */
+  --dojam:#A8A8A8;        --dojam-bg:rgba(0,0,0,.03);      /* ton — double, najsvjetlije */
+  --t-900:#0A0A0A; --t-600:#4D4D4D; --t-400:#8C8C8C; --t-300:#BFBFBF;
+  --crta:rgba(0,0,0,.14); --crta-2:rgba(0,0,0,.08); --pov:#FFFFFF; --pov-2:#FAFAFA;
+  --ui:'Fragment Mono',monospace;
+  --serif:'IM Fell English','Iowan Old Style',Georgia,serif;
+
+  /* razmak — 4px baza */
+  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:24px; --sp-6:32px;
+
+  /* radijusi — oštri rubovi na sadržaju, pill samo na akcijama, krug na statusu */
+  --r-sm:2px; --r:2px; --r-md:2px; --r-lg:3px; --r-full:999px;
+
+  /* elevacija — hairline umjesto sjene; sjena ostaje samo za plutajuće slojeve */
+  --sjena-1:0 1px 0 rgba(0,0,0,.08);
+  --sjena-2:0 1px 0 rgba(0,0,0,.1);
+  --sjena-3:0 16px 40px rgba(0,0,0,.22);
+  --sjena:var(--sjena-2);
+
+  /* pokret — jedan ritam kroz cijelu aplikaciju */
+  --dur-1:.12s; --dur-2:.18s; --dur-3:.28s;
+  --ease:cubic-bezier(.2,0,0,1);
+
+  /* sigurna područja (iOS notch / gesture bar) */
+  --safe-t:env(safe-area-inset-top,0px); --safe-b:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-reduced-motion:reduce){ :root{ --dur-1:.001s; --dur-2:.001s; --dur-3:.001s; } }
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+html{-webkit-text-size-adjust:100%}
+body{font-family:var(--serif);background:var(--pov);color:var(--t-900);font-size:15px;-webkit-font-smoothing:antialiased;overflow:hidden;overscroll-behavior-y:none;cursor:crosshair}
+button{font-family:var(--ui);cursor:pointer;border:none;background:none;color:inherit;font-size:inherit;-webkit-tap-highlight-color:transparent;letter-spacing:.03em}
+input,select,textarea{font-family:var(--serif)}
+button:focus-visible,select:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--zelena-600);outline-offset:2px;border-radius:2px}
+@media (hover:none) and (pointer:coarse){
+  .natrag,.widget,.brisi,.p-tab,.ton-cip,.dokNoviBtn{min-height:44px}
+}
+
+/* ---------- raspored ---------- */
+.app{display:grid;grid-template-columns:1fr 360px;grid-template-rows:56px 1fr;height:100vh;height:100dvh}
+.topbar{grid-column:1/3;display:flex;align-items:center;gap:10px;padding:0 16px;padding-top:var(--safe-t);border-bottom:1px solid var(--crta);background:var(--pov)}
+.editor-wrap{grid-column:1;overflow-y:auto;background:var(--pov);position:relative}
+.panel{grid-column:2;border-left:1px solid var(--crta);background:var(--pov);display:flex;flex-direction:column;overflow:hidden}
+
+/* ---------- gornja traka ---------- */
+.logo{display:flex;align-items:center;gap:9px;margin-right:6px}
+.logo .znak{width:30px;height:30px;border-radius:50%;background:var(--zelena-600);color:#fff;font-weight:700;font-size:15px;display:flex;align-items:center;justify-content:center}
+.logo .ime{font-weight:600;font-size:14px}
+.logo .ime span{color:var(--zelena-600)}
+.natrag{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--t-600);transition:background var(--dur-1) var(--ease)}
+.natrag:hover{background:var(--pov-2)}
+.doc-title{font-weight:500;font-size:14px;border:none;background:transparent;color:var(--t-900);flex:0 1 240px;min-width:0;padding:7px 9px;border-radius:6px}
+.doc-title:hover{background:var(--pov-2)}
+.doc-title:focus{outline:2px solid var(--zelena-600);background:var(--pov)}
+.tb-spacer{flex:1}
+.btn{border-radius:var(--r);padding:8px 14px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;transition:background var(--dur-1) var(--ease),border-color var(--dur-1) var(--ease),transform var(--dur-1) var(--ease)}
+.btn:active{transform:scale(.97)}
+.btn-zel{background:var(--zelena-600);color:#fff}
+.btn-zel:hover{background:var(--zelena-700)}
+.btn-obr{border:1px solid var(--crta);color:var(--t-600);background:var(--pov)}
+.btn-obr:hover{border-color:var(--t-300);color:var(--t-900)}
+.btn-tih{color:var(--t-600);padding:8px 10px;border-radius:var(--r)}
+.btn-tih:hover{background:var(--pov-2);color:var(--t-900)}
+.ocjena-tb{display:flex;align-items:center;gap:9px;padding:5px 8px;border-radius:var(--r)}
+.ocjena-tb:hover{background:var(--pov-2)}
+.ocjena-tb .prsten{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--t-900);background:conic-gradient(var(--zelena-600) calc(var(--p,0)*1%),var(--crta-2) 0)}
+.ocjena-tb .prsten i{width:24px;height:24px;border-radius:50%;background:var(--pov);display:flex;align-items:center;justify-content:center;font-style:normal}
+.ocjena-tb .lab{font-size:11px;color:var(--t-400);line-height:1.25;text-align:left}
+.ocjena-tb .lab b{display:block;font-size:12px;color:var(--t-900);font-weight:600}
+.tgl-panel{display:none;text-transform:uppercase;letter-spacing:.07em;}
+
+/* ---------- editor ---------- */
+.stranica{max-width:740px;margin:0 auto;padding:48px 60px 140px}
+#editor{font-family:var(--serif);font-size:19px;line-height:1.75;color:var(--t-900);outline:none;white-space:pre-wrap;word-wrap:break-word;min-height:60vh;caret-color:var(--t-900);cursor:text}
+#editor:empty::before{content:attr(data-placeholder);color:var(--t-300);pointer-events:none;font-style:italic}
+mark{background:transparent;color:inherit;padding-bottom:1px;cursor:pointer;border-bottom-width:2px;border-bottom-color:transparent;border-bottom-style:solid;transition:background var(--dur-1) var(--ease)}
+mark.tocnost{border-bottom-color:var(--tocnost);border-bottom-style:solid}
+mark.jasnoca{border-bottom-color:var(--jasnoca);border-bottom-style:dashed}
+mark.zanimljivost{border-bottom-color:var(--zanimljivost);border-bottom-style:dotted}
+mark.dojam{border-bottom-color:var(--dojam);border-bottom-style:double;border-bottom-width:3px}
+mark.tocnost:hover,mark.tocnost.fok{background:var(--tocnost-bg)}
+mark.jasnoca:hover,mark.jasnoca.fok{background:var(--jasnoca-bg)}
+mark.zanimljivost:hover,mark.zanimljivost.fok{background:var(--zanimljivost-bg)}
+mark.dojam:hover,mark.dojam.fok{background:var(--dojam-bg)}
+
+/* plutajući brojač (Grammarly widget) */
+.widget{position:fixed;z-index:40;right:calc(360px + var(--sp-6));bottom:var(--sp-6);width:46px;height:46px;border-radius:50%;background:var(--pov);box-shadow:var(--sjena-3);border:1px solid var(--crta);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;transition:transform var(--dur-2) var(--ease)}
+.widget:hover{transform:scale(1.06)}
+.widget.gre{color:#fff;background:#000;border-color:#000}
+.widget.ok{color:var(--t-900);background:var(--pov);border-color:var(--t-900);border-width:2px}
+.widget.radi{color:var(--t-400)}
+.widget.radi::after{content:"";position:absolute;inset:4px;border:2px solid var(--crta);border-top-color:var(--zelena-600);border-radius:50%;animation:vrti .8s linear infinite}
+@keyframes vrti{to{transform:rotate(1turn)}}
+
+/* ---------- inline kartica ---------- */
+.popover{position:absolute;z-index:60;width:300px;background:var(--pov);border:1px solid var(--crta);border-radius:var(--r-md);box-shadow:var(--sjena-3);padding:14px;display:none;transform-origin:top left}
+.popover.vidljiv{display:block;animation:pop var(--dur-2) var(--ease)}
+@keyframes pop{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.popover.vidljiv{animation:none}}
+.kat-red{display:flex;align-items:center;gap:7px;font-size:10px;font-weight:600;color:var(--t-400);margin-bottom:8px;font-family:var(--ui);text-transform:uppercase;letter-spacing:.07em;}
+.tocka{width:8px;height:8px;border-radius:50%;flex:none}
+.kat-red .pod{color:var(--t-400);font-weight:500}
+.zamjena{font-size:15px;margin-bottom:7px;line-height:1.5}
+.zamjena .staro{text-decoration:line-through;color:var(--t-400);font-style:italic}
+.zamjena .novo{color:var(--zelena-700);font-weight:600;background:var(--zelena-50);border-radius:4px;padding:1px 5px}
+.obj{color:var(--t-600);font-size:13px;line-height:1.55;margin-bottom:12px}
+.akcije{display:flex;gap:8px;align-items:center}
+
+/* ---------- desni panel ---------- */
+.p-glava{padding:16px 16px 0}
+.p-naslov{display:flex;align-items:baseline;gap:8px}
+.p-naslov h2{font-size:13px;font-weight:600;font-family:var(--ui);text-transform:uppercase;letter-spacing:.07em;}
+.p-naslov .uk{font-size:12px;color:var(--t-400)}
+.p-tabs{display:flex;gap:2px;margin-top:12px;border-bottom:1px solid var(--crta)}
+.p-tab{flex:1;padding:9px 4px;font-size:10.5px;font-weight:500;color:var(--t-600);border-bottom:2px solid transparent;display:flex;flex-direction:column;align-items:center;gap:4px;text-transform:uppercase;letter-spacing:.07em;}
+.p-tab .br{display:flex;align-items:center;gap:5px;font-weight:600;font-size:13px;color:var(--t-900)}
+.p-tab.akt{border-bottom-color:var(--t-900)}
+.p-tab:hover{background:var(--pov-2)}
+.ai-gumb{margin:12px 16px 0;display:flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--crta);border-radius:var(--r);padding:10px;font-weight:600;font-size:11px;color:var(--zelena-700);background:var(--zelena-50);font-family:var(--ui);text-transform:uppercase;letter-spacing:.07em;}
+.ai-gumb:hover{background:var(--zelena-100)}
+.skupno{margin:10px 16px 0;padding:9px 12px;font-size:11px;border:1px solid var(--crta);border-radius:var(--r);color:var(--t-600);font-weight:500;text-align:center;font-family:var(--ui);text-transform:uppercase;letter-spacing:.07em;}
+.skupno:hover{border-color:var(--zelena-600);color:var(--zelena-700)}
+.p-lista{flex:1;overflow-y:auto;padding:12px 16px 24px;display:flex;flex-direction:column;gap:8px}
+
+/* kartice prijedloga (sklopive, Grammarly stil) */
+.kartica{background:var(--pov);border:1px solid var(--crta);border-radius:var(--r-md);cursor:pointer;transition:box-shadow var(--dur-1) var(--ease),border-color var(--dur-1) var(--ease);overflow:hidden}
+.kartica:hover{box-shadow:var(--sjena-2);border-color:var(--t-300)}
+.kartica.otv{box-shadow:var(--sjena-2);border-color:var(--crta)}
+.k-sazeto{display:flex;align-items:center;gap:9px;padding:12px 13px}
+.k-sazeto .traka{width:3px;align-self:stretch;border-radius:2px;flex:none}
+.k-sazeto .tekst{flex:1;min-width:0;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.k-sazeto .tekst .staro{text-decoration:line-through;color:var(--t-400)}
+.k-sazeto .tekst .novo{font-weight:600}
+.k-sazeto .vrsta{font-size:9.5px;color:var(--t-400);flex:none;font-family:var(--ui);text-transform:uppercase;letter-spacing:.07em;}
+.k-detalj{display:none;padding:0 13px 13px 25px}
+.kartica.otv .k-detalj{display:block;animation:detalj-otvori var(--dur-2) var(--ease)}
+@keyframes detalj-otvori{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.kartica .akcije{margin-top:2px}
+.p-prazno{padding:46px 26px;text-align:center;color:var(--t-600);font-size:14.5px;line-height:1.6;font-style:italic}
+.p-prazno .krug-ok{width:52px;height:52px;border-radius:50%;background:var(--zelena-100);color:var(--zelena-700);font-size:24px;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;animation:krug-pojavi var(--dur-3) var(--ease)}
+@keyframes krug-pojavi{from{opacity:0;transform:scale(.7)}to{opacity:1;transform:none}}
+
+/* ---------- AI panel ---------- */
+.ai-panel{flex:1;overflow-y:auto;padding:14px 16px;display:none;flex-direction:column;gap:12px}
+.ai-panel.akt{display:flex}
+.p-lista-wrap{display:flex;flex-direction:column;flex:1;overflow:hidden}
+.p-lista-wrap.skriven{display:none}
+.ai-blok{border:1px solid var(--crta);border-radius:10px;background:var(--pov);padding:13px 14px}
+.ai-blok h3{font-size:13px;font-weight:600;display:flex;align-items:center;gap:7px;margin-bottom:4px}
+.ai-blok p{font-size:12.5px;color:var(--t-600);line-height:1.5;margin-bottom:10px}
+.ai-red{display:flex;flex-wrap:wrap;gap:6px}
+.ton-cip{font-size:11px;padding:6px 12px;border-radius:999px;border:1px solid var(--crta);background:var(--pov);color:var(--t-600);font-weight:500;font-family:var(--ui);text-transform:uppercase;letter-spacing:.07em;}
+.ton-cip:hover{border-color:var(--zelena-600);color:var(--zelena-700);background:var(--zelena-50)}
+.ai-blok select{width:100%;font-family:var(--ui);font-size:13px;border:1px solid var(--crta);background:var(--pov);border-radius:var(--r);padding:9px;margin-bottom:8px;color:var(--t-900)}
+.ai-rezultat{border:1px solid var(--crta);border-radius:var(--r);background:var(--pov-2);padding:12px;margin-top:10px}
+.ai-rezultat .oznaka{font-size:10px;font-weight:600;color:var(--zelena-700);margin-bottom:5px;font-family:var(--ui);text-transform:uppercase;letter-spacing:.07em;}
+.ai-rezultat .tekst{font-size:13.5px;line-height:1.6;margin-bottom:10px;white-space:pre-wrap}
+.ucitava{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--t-600);padding:10px 2px}
+.ucitava::before{content:"";width:14px;height:14px;border:2px solid var(--crta);border-top-color:var(--zelena-600);border-radius:50%;animation:vrti .8s linear infinite;flex:none}
+.ai-greska{font-size:12.5px;color:#000;font-weight:600;background:var(--tocnost-bg);border-radius:var(--r);padding:9px 11px;margin-top:8px;line-height:1.5}
+.ai-nap{font-size:11.5px;color:var(--t-400);line-height:1.45;margin-top:8px}
+.jm-lista{display:flex;flex-direction:column;gap:6px}
+.jm-red{border:1px solid var(--crta);border-radius:var(--r);padding:9px 11px}
+.jm-red .hr{font-size:14px;font-weight:600}
+.jm-red .obj-kratko{font-size:12px;color:var(--t-600);margin-top:2px;line-height:1.4;font-style:italic}
+.jm-red button{font-size:10px;font-family:var(--ui);text-transform:uppercase;letter-spacing:.06em;color:var(--t-600);margin-top:6px}
+.jm-red button:hover{color:var(--t-900)}
+.jm-red .prijevod{margin-top:7px;padding-top:7px;border-top:1px dashed var(--crta);font-size:13px}
+.jm-red .prijevod .oz{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--t-400);font-family:var(--ui);margin-bottom:3px}
+
+/* ---------- modal Ciljevi ---------- */
+.zastor{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;display:none;align-items:center;justify-content:center;padding:18px}
+.zastor.vidljiv{display:flex}
+.modal{background:var(--pov);border-radius:var(--r-lg);max-width:480px;width:100%;padding:26px 26px 22px;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.modal h2{font-size:18px;font-weight:700;margin-bottom:4px}
+.modal .pod{font-size:13.5px;color:var(--t-600);margin-bottom:18px;font-style:italic}
+.cilj-grupa{margin-bottom:15px}
+.cilj-grupa label{display:block;font-size:10.5px;font-weight:600;color:var(--t-600);margin-bottom:7px;font-family:var(--ui);text-transform:uppercase;letter-spacing:.07em}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button{font-size:11px;padding:7px 13px;border-radius:999px;border:1px solid var(--crta);color:var(--t-600);font-weight:500;font-family:var(--ui);text-transform:uppercase;letter-spacing:.07em;}
+.seg button.akt{border-color:var(--zelena-600);color:var(--zelena-700);background:var(--zelena-50);font-weight:600}
+.modal .dno{display:flex;justify-content:flex-end;gap:8px;margin-top:6px}
+
+
+/* ---------- radna ploča (Moji dokumenti) ---------- */
+.dash{position:fixed;inset:0;background:var(--pov-2);z-index:50;display:none;flex-direction:column;overflow:auto}
+.dash.vidljiv{display:flex}
+body.dash-aktivan .widget{display:none}
+.dash-top{height:56px;flex:none;display:flex;align-items:center;gap:10px;padding:0 20px;background:var(--pov);border-bottom:1px solid var(--crta);position:sticky;top:0;z-index:2}
+.dash-sadrzaj{max-width:1040px;width:100%;margin:0 auto;padding:30px 20px 70px}
+.dash h1{font-size:20px;font-weight:700;margin-bottom:6px}
+.dash .pod-h{font-size:14px;color:var(--t-600);margin-bottom:22px;font-style:italic}
+.dash-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:14px}
+.dok{position:relative;background:var(--pov);border:1px solid var(--crta);border-radius:var(--r-lg);min-height:212px;display:flex;flex-direction:column;cursor:pointer;transition:box-shadow var(--dur-1) var(--ease),border-color var(--dur-1) var(--ease),transform var(--dur-1) var(--ease);overflow:hidden;text-align:left}
+.dok:active{transform:scale(.99)}
+.dok:hover{box-shadow:var(--sjena-2);border-color:var(--t-300)}
+.dok .pregled{flex:1;padding:14px 14px 8px;font-size:10.5px;line-height:1.65;color:var(--t-400);overflow:hidden;border-bottom:1px solid var(--crta-2);white-space:pre-wrap;max-height:128px}
+.dok .pregled.prazan{display:flex;align-items:center;justify-content:center;font-style:italic}
+.dok .meta{padding:11px 13px;display:flex;align-items:center;gap:9px}
+.dok .meta .ime-d{flex:1;min-width:0}
+.dok .meta .ime-d b{display:block;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dok .meta .ime-d span{font-size:11px;color:var(--t-400)}
+.oc-cip{font-size:10px;font-weight:700;padding:3px 9px;border-radius:999px;flex:none;font-family:var(--ui);text-transform:uppercase;letter-spacing:.07em;}
+.oc-zel{background:var(--zelena-100);color:var(--zelena-700)}
+.oc-zut{background:rgba(0,0,0,.08);color:var(--t-600)}
+.oc-crv{background:rgba(0,0,0,.14);color:#000;font-weight:700}
+.dok .brisi{position:absolute;top:8px;right:8px;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--t-400);background:var(--pov);border:1px solid var(--crta);opacity:0;transition:opacity var(--dur-1) var(--ease)}
+.dok:hover .brisi{opacity:1}
+.dok .brisi:hover{color:#000;border-color:#000}
+.dok-novi{border:1.5px dashed var(--crta);background:transparent;align-items:center;justify-content:center;color:var(--t-600);gap:12px;display:flex;flex-direction:column;font-weight:600;font-size:13px}
+.dok-novi:hover{border-color:var(--zelena-600);color:var(--zelena-700);background:var(--zelena-50);box-shadow:none}
+.dok-novi .plus{width:46px;height:46px;border-radius:50%;background:var(--zelena-600);color:#fff;font-size:26px;font-weight:400;display:flex;align-items:center;justify-content:center;line-height:1}
+@media (max-width:560px){.dash-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}.dok{min-height:180px}}
+
+/* ---------- toast ---------- */
+.toast{position:fixed;bottom:calc(24px + var(--safe-b));left:50%;transform:translateX(-50%);background:var(--t-900);color:#fff;font-size:13px;padding:10px 16px;border-radius:var(--r);display:flex;gap:14px;align-items:center;box-shadow:var(--sjena-3);z-index:90;opacity:0;pointer-events:none;transition:opacity var(--dur-2) var(--ease)}
+.toast.vidljiv{opacity:1;pointer-events:auto}
+.toast button{color:#fff;font-weight:600;text-decoration:underline;text-underline-offset:2px}
+
+/* ---------- onboarding ---------- */
+.ob{background:var(--pov);border-radius:var(--r-lg);max-width:430px;width:100%;padding:34px 32px 26px;box-shadow:0 20px 60px rgba(0,0,0,.3);text-align:center}
+.ob .ob-znak{width:46px;height:46px;border-radius:50%;background:var(--zelena-600);color:#fff;font-weight:700;font-size:22px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px}
+.ob h1{font-size:23px;font-weight:700;line-height:1.25;margin-bottom:10px}
+.ob p{color:var(--t-600);font-size:15px;line-height:1.6;margin-bottom:22px;font-style:italic}
+.ob .btn-zel{padding:11px 26px;font-size:14px}
+.ob .preskoci{display:block;margin:13px auto 0;font-size:12.5px;color:var(--t-400)}
+.ob .preskoci:hover{color:var(--t-600)}
+.ob-jezik{width:100%;font-family:var(--ui);font-size:12px;text-transform:uppercase;letter-spacing:.06em;border:1px solid var(--crta);border-radius:var(--r);padding:11px;margin-bottom:16px;color:var(--t-900);background:var(--pov)}
+
+/* ---------- plutajuća traka na selekciji teksta ---------- */
+.sel-toolbar{position:absolute;z-index:55;display:flex;align-items:center;gap:2px;background:var(--t-900);border-radius:var(--r-full);padding:5px;box-shadow:var(--sjena-3);transform:translate(-50%,-100%);animation:sel-pojavi var(--dur-2) var(--ease)}
+@keyframes sel-pojavi{from{opacity:0;transform:translate(-50%,calc(-100% + 6px)) scale(.96)}to{opacity:1;transform:translate(-50%,-100%)}}
+.sel-toolbar button{display:flex;align-items:center;gap:6px;padding:7px 11px;border-radius:var(--r-full);font-size:11px;font-weight:600;color:#fff;white-space:nowrap;font-family:var(--ui);text-transform:uppercase;letter-spacing:.07em;transition:background var(--dur-1) var(--ease)}
+.sel-toolbar button:hover{background:rgba(255,255,255,.14)}
+.sel-toolbar .razdj{width:1px;height:16px;background:rgba(255,255,255,.18);flex:none}
+
+.scrim{display:none}
+
+/* ---------- responzivnost — wide / tablet / telefon ---------- */
+@media (min-width:1440px){
+  .app{grid-template-columns:1fr 392px}
+  .stranica{max-width:800px}
+  .widget{right:calc(392px + var(--sp-6))}
+}
+
+@media (max-width:1020px){
+  .app{grid-template-columns:1fr 0}
+  .stranica{padding:26px 18px 130px}
+  #editor{font-size:16px}
+  .panel{position:fixed;top:56px;right:0;bottom:0;width:min(380px,93vw);transform:translateX(105%);transition:transform var(--dur-3) var(--ease);box-shadow:-10px 0 32px rgba(0,0,0,.16);z-index:70;border-left:1px solid var(--crta);padding-bottom:var(--safe-b)}
+  .panel.otvoren{transform:none}
+  .tgl-panel{display:flex;align-items:center;gap:7px;border:1px solid var(--crta);border-radius:999px;padding:6px 12px;font-size:13px;background:var(--pov)}
+  .tgl-panel .bedz{background:var(--tocnost);color:#fff;border-radius:999px;font-size:11px;min-width:18px;height:18px;display:flex;align-items:center;justify-content:center;padding:0 5px;font-weight:700}
+  .logo .ime,.ocjena-tb .lab{display:none}
+  .topbar{gap:6px;padding:0 10px;padding-top:var(--safe-t)}
+  .doc-title{flex:0 1 120px}
+  .popover{width:min(300px,calc(100vw - 28px))}
+  .widget{right:16px;bottom:calc(16px + var(--safe-b))}
+  .scrim{display:block;position:fixed;inset:0;background:rgba(0,0,0,.32);z-index:65;opacity:0;pointer-events:none;transition:opacity var(--dur-2) var(--ease)}
+  .scrim.vidljiv{opacity:1;pointer-events:auto}
+  @media (prefers-reduced-motion:reduce){.panel{transition:none}}
+}
+
+@media (max-width:640px){
+  .stranica{padding:24px 16px 120px}
+  #editor{font-size:16.5px;line-height:1.7} /* ≥16px sprječava iOS auto-zoom na fokus */
+  .doc-title{flex:1 1 auto;min-width:60px}
+
+  .panel{top:auto;left:0;right:0;bottom:0;width:100%;max-height:82vh;border-radius:var(--r-lg) var(--r-lg) 0 0;border-left:none;border-top:1px solid var(--crta);transform:translateY(100%)}
+  .panel.otvoren{transform:translateY(0)}
+  .panel::before{content:"";display:block;width:36px;height:4px;border-radius:999px;background:var(--crta);margin:10px auto 2px;flex:none}
+
+  .popover{position:fixed;left:12px !important;right:12px;bottom:calc(16px + var(--safe-b));top:auto !important;width:auto}
+  .sel-toolbar{position:fixed;left:50% !important;top:auto !important;bottom:calc(90px + var(--safe-b));transform:translateX(-50%) !important}
+  @keyframes sel-pojavi{from{opacity:0;transform:translateX(-50%) translateY(8px) scale(.96)}to{opacity:1;transform:translateX(-50%)}}
+
+  .dash-grid{grid-template-columns:repeat(auto-fill,minmax(min(150px,100%),1fr));gap:10px}
+  .dok{min-height:180px}
+  /* na dodirnim uređajima nema hover, pa gumb brisanja mora biti stalno vidljiv */
+  .dok .brisi{opacity:.85;width:32px;height:32px}
+  .dash-top .email{display:none}
+  .modal{max-width:100%}
+}
+@media (hover:none) and (pointer:coarse){
+  .dok .brisi{opacity:.85}
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- gornja traka -->
+  <header class="topbar">
+    <button class="natrag" title="Natrag na dokumente"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <div class="logo"><div class="znak">P</div><div class="ime">Pravopis<span>.io</span></div></div>
+    <input class="doc-title" id="naslov" value="probni dokument" aria-label="Naslov dokumenta">
+    <div class="tb-spacer"></div>
+    <button class="ocjena-tb" id="ocjenaBtn" title="Ukupna ocjena teksta: točnost, jasnoća, zanimljivost i dojam">
+      <span class="prsten" id="prsten"><i id="ocjenaBroj">—</i></span>
+      <span class="lab">Ukupna<b id="ocjenaLab">ocjena</b></span>
+    </button>
+    <button class="btn btn-obr" id="ciljeviBtn">🎯 Ciljevi</button>
+    <button class="tgl-panel" id="tglPanel" aria-label="Otvori prijedloge">Prijedlozi <span class="bedz" id="bedz">0</span></button>
+  </header>
+
+  <!-- editor -->
+  <main class="editor-wrap" id="editorWrap">
+    <div class="stranica">
+      <div id="editor" contenteditable="true" spellcheck="false"
+           data-placeholder="počnite pisati ili zalijepite tekst…"
+           aria-label="Platno za pisanje"></div>
+      <div class="sel-toolbar" id="selToolbar" role="toolbar" aria-label="Brze AI radnje za označeni tekst" style="display:none">
+        <button data-akc="preoblikuj"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.4z"/></svg>Preoblikuj</button>
+        <div class="razdj"></div>
+        <button data-akc="ton">Ton</button>
+        <div class="razdj"></div>
+        <button data-akc="jasnoca">Jasnoća</button>
+        <div class="razdj"></div>
+        <button data-akc="dijalekt">Dijalekt</button>
+      </div>
+    </div>
+  </main>
+
+  <!-- plutajući brojač grešaka (widget) -->
+  <button class="widget radi" id="widget" title="Prijedlozi"></button>
+
+  <!-- zaslon iza ladice prijedloga na tabletu/mobitelu -->
+  <div class="scrim" id="scrim"></div>
+
+  <!-- desni panel -->
+  <aside class="panel" id="panel" aria-label="Ploča prijedloga">
+    <div class="p-glava">
+      <div class="p-naslov"><h2>Prijedlozi</h2><span class="uk" id="ukUk"></span></div>
+      <div class="p-tabs" id="tabs"></div>
+    </div>
+    <button class="ai-gumb" id="aiGumb"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.4z"/></svg> AI pomoćnik</button>
+
+    <div class="p-lista-wrap" id="prijWrap">
+      <button class="skupno" id="skupno" style="display:none"></button>
+      <div class="p-lista" id="lista"></div>
+    </div>
+
+    <div class="ai-panel" id="aiPanel">
+      <div class="ai-blok">
+        <h3><span class="tocka" style="background:var(--zelena-600)"></span>Preoblikuj</h3>
+        <p>Označite rečenicu ili odlomak pa zatražite 3 varijante — kraću, jasniju i formalniju.</p>
+        <button class="btn btn-zel" onclick="aiPreoblikuj()">Preoblikuj odabrano</button>
+        <div id="rezPreoblikuj"></div>
+      </div>
+      <div class="ai-blok">
+        <h3><span class="tocka" style="background:var(--dojam)"></span>Prilagodi ton</h3>
+        <p>Cijeli tekst ili selekcija prepisuje se u odabranom tonu.</p>
+        <div class="ai-red" id="tonovi"></div>
+        <div id="rezTon"></div>
+      </div>
+      <div class="ai-blok">
+        <h3><span class="tocka" style="background:var(--jasnoca)"></span>Jasnoća</h3>
+        <p>Pojednostavnite složene rečenice bez gubitka značenja.</p>
+        <button class="btn btn-obr" onclick="aiJasnoca()">Pojednostavi odabrano</button>
+        <div id="rezJasnoca"></div>
+      </div>
+      <div class="ai-blok">
+        <h3><span class="tocka" style="background:var(--zanimljivost)"></span>Dijalekti i povijesni oblici</h3>
+        <p>Kulturna transformacija teksta — nije lektura, nego baština.</p>
+        <select id="dijalekt">
+          <option value="kajkavski (zagorski)">kajkavski / zagorski</option>
+          <option value="čakavski">čakavski</option>
+          <option value="štokavski (ikavica)">štokavski (ikavica)</option>
+          <option value="splitski govor">splitski</option>
+          <option value="zagrebački govor">zagrebački</option>
+          <option value="starohrvatski (glagoljaška tradicija 12.–16. st.)">starohrvatski (12.–16. st.)</option>
+        </select>
+        <button class="btn btn-zel" onclick="aiDijalekt()">Pretvori odabrano</button>
+        <div id="rezDijalekt"></div>
+        <div class="ai-nap">AI funkcije rade na selekciji ili na početku teksta (do ~1500 znakova) — ograničenje prototipa. Vaši ciljevi teksta prosljeđuju se asistentu.</div>
+      </div>
+      <div class="ai-blok">
+        <h3><span class="tocka" style="background:#000"></span>jezični most — administracija</h3>
+        <p>pet pojmova koje imigrant treba dan prije nego mu zatrebaju. objašnjenje se generira kroz vaš materinji jezik: <b id="jmJezik"></b>.</p>
+        <div id="jmLista" class="jm-lista"></div>
+        <div class="ai-nap">demo paket — puna verzija (rad, studij, obiteljsko spajanje, azil) kurira se s partnerskim organizacijama, ne generira slobodno.</div>
+      </div>
+    </div>
+  </aside>
+</div>
+
+
+<!-- radna ploča: Moji dokumenti -->
+<div class="dash" id="dash">
+  <div class="dash-top">
+    <div class="logo"><div class="znak">P</div><div class="ime">Pravopis<span>.io</span></div></div>
+    <div class="tb-spacer"></div>
+    <button class="btn btn-zel" id="dashNovi2">+ Novi dokument</button>
+  </div>
+  <div class="dash-sadrzaj">
+    <h1>moji dokumenti</h1>
+    <div class="pod-h">nastavite gdje ste stali — ili započnite nešto novo.</div>
+    <div class="dash-grid" id="dashGrid"></div>
+  </div>
+</div>
+
+<!-- inline kartica -->
+<div class="popover" id="popover" role="dialog" aria-label="Prijedlog ispravka"></div>
+
+<!-- toast -->
+<div class="toast" id="toast"><span id="toastTekst"></span><button id="toastAkcija" style="display:none">Poništi</button></div>
+
+<!-- modal Ciljevi -->
+<div class="zastor" id="ciljeviModal">
+  <div class="modal">
+    <h2>postavite ciljeve teksta</h2>
+    <div class="pod">prijedlozi i ai pomoćnik prilagođavaju se vašoj publici i namjeri.</div>
+    <div class="cilj-grupa"><label>publika</label><div class="seg" data-c="publika"></div></div>
+    <div class="cilj-grupa"><label>formalnost</label><div class="seg" data-c="formalnost"></div></div>
+    <div class="cilj-grupa"><label>područje</label><div class="seg" data-c="podrucje"></div></div>
+    <div class="cilj-grupa"><label>namjera</label><div class="seg" data-c="namjera"></div></div>
+    <div class="dno">
+      <button class="btn btn-obr" id="ciljeviZatvori">Zatvori</button>
+      <button class="btn btn-zel" id="ciljeviSpremi">Spremi ciljeve</button>
+    </div>
+  </div>
+</div>
+
+<!-- onboarding -->
+<div class="zastor vidljiv" id="onboarding">
+  <div class="ob">
+    <div class="ob-znak">P</div>
+    <h1 id="obNaslov"></h1>
+    <p id="obTekst"></p>
+    <select id="obJezik" class="ob-jezik" style="display:none"></select>
+    <button class="btn btn-zel" id="obDalje"></button>
+    <button class="preskoci" id="obPreskoci">Preskoči uvod</button>
+  </div>
+</div>
+
+<script>
+/* ============ Pravopis.io — Grammarly-style prototip ============ */
+const ed=document.getElementById('editor'),wrap=document.getElementById('editorWrap'),
+pop=document.getElementById('popover'),lista=document.getElementById('lista'),
+tabsEl=document.getElementById('tabs'),widget=document.getElementById('widget');
+
+const KAT={
+ tocnost:{ime:'Točnost',boja:'var(--tocnost)'},
+ jasnoca:{ime:'Jasnoća',boja:'var(--jasnoca)'},
+ zanimljivost:{ime:'Zanimljivost',boja:'var(--zanimljivost)'},
+ dojam:{ime:'Dojam',boja:'var(--dojam)'}
+};
+let issues=[],aktivanFiltar='sve',ignorirano=new Set(),rjecnik=new Set(),lastSel=null,fokIdx=-1,otvorenaKartica=null;
+
+/* ---------- ciljevi teksta ---------- */
+const CILJ_OPCIJE={
+ publika:['Općenita','Upućena','Stručna'],
+ formalnost:['Neformalno','Neutralno','Formalno'],
+ podrucje:['Općenito','Akademsko','Poslovno','Novinarsko','Kreativno'],
+ namjera:['Informirati','Opisati','Uvjeriti','Ispričati priču']};
+let ciljevi={publika:'Općenita',formalnost:'Neutralno',podrucje:'Poslovno',namjera:'Informirati'};
+const ciljStr=()=>'publika: '+ciljevi.publika+', formalnost: '+ciljevi.formalnost+', područje: '+ciljevi.podrucje+', namjera: '+ciljevi.namjera;
+
+/* ---------- pravilni motor ---------- */
+const NIJEC={neznam:'ne znam',neznaš:'ne znaš',nezna:'ne zna',neznamo:'ne znamo',neznate:'ne znate',neznaju:'ne znaju',
+nebi:'ne bi',nebih:'ne bih',nebismo:'ne bismo',nebiste:'ne biste',
+nemogu:'ne mogu',nemožeš:'ne možeš',nemože:'ne može',nemožemo:'ne možemo',nemožete:'ne možete'};
+const KRIVO={sumljam:'sumnjam',sumljaš:'sumnjaš',sumlja:'sumnja',sumljamo:'sumnjamo',sumljaju:'sumnjaju',uvjek:'uvijek',ljepo:'lijepo',obadva:'oba'};
+const PLEO=[
+ [/\bvremenski period\b/gi,'razdoblje','Pleonazam: »period« već označava vremenski odsječak. Dovoljno je »razdoblje«.'],
+ [/\bno međutim\b/gi,'međutim','»No« i »međutim« znače isto — upotrijebite samo jedno.'],
+ [/\bčak štoviše\b/gi,'štoviše','»Čak« i »štoviše« udvajaju isto pojačanje — dovoljno je »štoviše«.'],
+ [/\bukoliko\b/gi,'ako','»Ukoliko« je administrativizam; u većini rečenica prirodnije je »ako«.'],
+ [/\bpo pitanju\b/gi,'u vezi s','»Po pitanju« je kalk iz administrativnog stila; bolje je »u vezi s« ili izravna dopuna.']
+];
+const cap=(s,uzor)=>/[A-ZČĆĐŠŽ]/.test(uzor[0])?s[0].toUpperCase()+s.slice(1):s;
+
+function computeIssues(text){
+ const out=[];let id=0;
+ const push=(start,end,kat,pod,sug,obj)=>{const orig=text.slice(start,end);
+  if(ignorirano.has(kat+'|'+orig.toLowerCase()))return;
+  if(!/\s/.test(orig)&&rjecnik.has(orig.toLowerCase()))return;
+  out.push({id:id++,start,end,kat,pod,original:orig,sug,obj});};
+ let m;
+ const nijRe=new RegExp('\\b('+Object.keys(NIJEC).join('|')+')\\b','gi');
+ while((m=nijRe.exec(text)))push(m.index,m.index+m[0].length,'tocnost','Pravopis',cap(NIJEC[m[0].toLowerCase()],m[0]),'Niječnica »ne« piše se odvojeno od glagola.');
+ const krRe=new RegExp('\\b('+Object.keys(KRIVO).join('|')+')\\b','gi');
+ while((m=krRe.exec(text)))push(m.index,m.index+m[0].length,'tocnost','Pravopis',cap(KRIVO[m[0].toLowerCase()],m[0]),'Često pogrešno pisanje — standardni je oblik »'+KRIVO[m[0].toLowerCase()]+'«.');
+ const jelRe=/\bjel\b/gi;while((m=jelRe.exec(text)))push(m.index,m.index+3,'tocnost','Pravopis',cap('je li',m[0]),'U upitnim konstrukcijama standardni je oblik »je li«.');
+ const krat=/\b(npr|tj|itd)\b(?!\.)/g;while((m=krat.exec(text)))push(m.index,m.index+m[0].length,'tocnost','Pravopis',m[0]+'.','Kratica »'+m[0]+'« piše se s točkom.');
+ const ri2=/ +([,.;:!?])(?=[A-Za-zČĆĐŠŽčćđšž])/g;while((m=ri2.exec(text)))push(m.index,m.index+m[0].length,'tocnost','Interpunkcija',m[1]+' ','Ispred interpunkcijskog znaka nema razmaka, a iza njega dolazi jedan razmak.');
+ const ri=/ +([,.;:!?])/g;while((m=ri.exec(text)))push(m.index,m.index+m[0].length,'tocnost','Interpunkcija',m[1],'Ispred interpunkcijskog znaka ne dolazi razmak.');
+ const dr=/  +/g;while((m=dr.exec(text)))push(m.index,m.index+m[0].length,'tocnost','Tipografija',' ','Dvostruki razmak — dovoljan je jedan.');
+ const zb=/,(?=[A-Za-zČĆĐŠŽčćđšž])/g;while((m=zb.exec(text)))push(m.index,m.index+1,'tocnost','Interpunkcija',', ','Iza zareza dolazi razmak.');
+ const vs=/(^|[.!?]\s+)([a-zčćđšž])/g;while((m=vs.exec(text))){const i=m.index+m[1].length;push(i,i+1,'tocnost','Velika i mala slova',text[i].toUpperCase(),'Rečenica počinje velikim slovom.');}
+ const sa=/\b([Ss]a)\s+([a-zA-ZčćđšžČĆĐŠŽ]+)/g;
+ while((m=sa.exec(text))){const w=m[2].toLowerCase();
+  if('sšzž'.includes(w[0])||w==='mnom'||/^(ps|ks|kš|pš|x)/.test(w))continue;
+  push(m.index,m.index+m[1].length,'tocnost','Gramatika',m[1][0]==='S'?'S':'s','Prijedlog »sa« dolazi samo ispred s, š, z, ž i teških suglasničkih skupina (sa školom, sa mnom). Ovdje je pravilno »s«: s '+m[2]+'.');}
+ const gk=/\b([Gg]dje)\s+(idem|ideš|ide|idemo|idete|idu|putuje\w*|odlazi\w*|krećem\w*)\b/g;
+ while((m=gk.exec(text)))push(m.index,m.index+m[1].length,'tocnost','Gramatika',m[1][0]==='G'?'Kamo':'kamo','Uz glagole kretanja pitamo »kamo« (cilj kretanja); »gdje« označava mjesto mirovanja.');
+ const uv=/\b([Uu] vezi)\s+(?!s\s|sa\s)(?=[a-zčćđšž])/g;
+ while((m=uv.exec(text)))push(m.index,m.index+m[1].length,'tocnost','Gramatika',m[1]+' s','Uz »u vezi« dolazi instrumental s prijedlogom s: u vezi s natječajem, u vezi s tim.');
+ const ob=/\b(s )?obzirom da\b/gi;
+ while((m=ob.exec(text)))push(m.index,m.index+m[0].length,'tocnost','Gramatika',cap('s obzirom na to da',m[0]),'Pravilna je konstrukcija »s obzirom na to da«.');
+ for(const[re,sug,obj]of PLEO){re.lastIndex=0;while((m=re.exec(text)))push(m.index,m.index+m[0].length,'jasnoca','Sažetost',cap(sug,m[0]),obj);}
+ const reR=/[^.!?\n]+[.!?]?/g;
+ while((m=reR.exec(text))){const br=m[0].trim().split(/\s+/).filter(Boolean).length;
+  if(br>35)push(m.index+(m[0].length-m[0].trimStart().length),m.index+m[0].length,'jasnoca','Čitljivost',null,'Rečenica ima '+br+' riječi — razmislite o podjeli na dvije kraće radi čitljivosti.');}
+ out.sort((a,b)=>a.start-b.start||a.id-b.id);
+ const cisto=[];let kraj=-1;
+ for(const i of out){if(i.start>=kraj){cisto.push(i);kraj=i.end;}}
+ cisto.forEach((i,n)=>i.id=n);
+ return cisto;
+}
+
+/* ---------- tekst, caret, render ---------- */
+function getText(el){let s='';(function w(n){for(const c of n.childNodes){
+ if(c.nodeType===3)s+=c.data;
+ else if(c.nodeName==='BR')s+='\n';
+ else{if(/^(DIV|P)$/.test(c.nodeName)&&s&&!s.endsWith('\n'))s+='\n';w(c);}}})(el);return s;}
+function offsetOf(el,node,off){let acc=0,done=false;
+ (function w(n){if(done)return;
+  if(n===node&&n.nodeType===3){acc+=off;done=true;return;}
+  if(n.nodeType===3){acc+=n.data.length;return;}
+  if(n===node){let k=0;for(const c of n.childNodes){if(k>=off)break;w(c);k++;}done=true;return;}
+  if(n.nodeName==='BR'){acc+=1;return;}
+  for(const c of n.childNodes){w(c);if(done)return;}})(el);
+ return done?acc:null;}
+function caretOffset(){const s=window.getSelection();if(!s.rangeCount)return null;
+ const r=s.getRangeAt(0);if(!ed.contains(r.startContainer))return null;
+ return offsetOf(ed,r.startContainer,r.startOffset);}
+function setCaret(off){const r=document.createRange();let acc=0,done=false;
+ (function w(n){if(done)return;
+  if(n.nodeType===3){if(acc+n.data.length>=off){r.setStart(n,off-acc);done=true;}else acc+=n.data.length;return;}
+  if(n.nodeName==='BR'){acc+=1;if(acc>=off){r.setStartAfter(n);done=true;}return;}
+  for(const c of n.childNodes){w(c);if(done)return;}})(ed);
+ if(!done){r.selectNodeContents(ed);r.collapse(false);}
+ r.collapse(true);const s=window.getSelection();s.removeAllRanges();s.addRange(r);}
+const esc=t=>t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const nl=t=>t.replace(/\n/g,'<br>');
+function renderEditor(text){
+ let html='',poz=0;
+ for(const i of issues){
+  html+=nl(esc(text.slice(poz,i.start)));
+  html+='<mark class="'+i.kat+'" data-id="'+i.id+'">'+nl(esc(text.slice(i.start,i.end)))+'</mark>';
+  poz=i.end;}
+ html+=nl(esc(text.slice(poz)));
+ ed.innerHTML=html;}
+
+/* ---------- analiza ---------- */
+let deb;
+function analiziraj(zadrziCaret=true){
+ const text=getText(ed);
+ issues=computeIssues(text);
+ const off=zadrziCaret?caretOffset():null;
+ renderEditor(text);
+ if(off!=null)setCaret(off);
+ renderPanel();statistika(text);if(trenutni)trenutni.tekst=text;}
+const selToolbar=document.getElementById('selToolbar');
+ed.addEventListener('input',()=>{zatvoriPop();zatvoriSelToolbar();lastSel=null;widget.className='widget radi';widget.textContent='';
+ clearTimeout(deb);deb=setTimeout(()=>analiziraj(),800);});
+ed.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();document.execCommand('insertLineBreak');}});
+ed.addEventListener('paste',e=>{e.preventDefault();document.execCommand('insertText',false,(e.clipboardData||window.clipboardData).getData('text/plain'));});
+document.addEventListener('selectionchange',()=>{
+ const s=window.getSelection();if(!s.rangeCount){zatvoriSelToolbar();return;}
+ const r=s.getRangeAt(0);
+ if(!r.collapsed&&ed.contains(r.startContainer)&&ed.contains(r.endContainer)){
+  const a=offsetOf(ed,r.startContainer,r.startOffset),b=offsetOf(ed,r.endContainer,r.endOffset);
+  if(a!=null&&b!=null&&b>a){
+   lastSel={s:a,e:b};
+   const rr=r.getBoundingClientRect(),wr=wrap.getBoundingClientRect();
+   if(rr.width>0){
+    selToolbar.style.left=Math.max(8,Math.min(rr.left+rr.width/2-wr.left+wrap.scrollLeft,wrap.clientWidth-8))+'px';
+    selToolbar.style.top=(rr.top-wr.top+wrap.scrollTop-10)+'px';
+    selToolbar.style.display='flex';}
+   return;}}
+ zatvoriSelToolbar();});
+function zatvoriSelToolbar(){selToolbar.style.display='none';}
+selToolbar.addEventListener('click',e=>{
+ const b=e.target.closest('button');if(!b)return;
+ const akc=b.dataset.akc;
+ otvoriAiIzSelekcije();
+ if(akc==='preoblikuj')aiPreoblikuj();
+ else if(akc==='jasnoca')aiJasnoca();
+ else if(akc==='dijalekt')aiDijalekt();
+ /* 'ton' samo otvara ploču — korisnik bira konkretan ton među čipovima */
+ zatvoriSelToolbar();});
+
+/* ---------- panel ---------- */
+const plPr=n=>n===1?'1 prijedlog':n+' prijedloga';
+function renderPanel(){
+ const b={tocnost:0,jasnoca:0,zanimljivost:0,dojam:0};
+ issues.forEach(i=>b[i.kat]++);
+ const ukupno=issues.length;
+ document.getElementById('bedz').textContent=ukupno;
+ document.getElementById('ukUk').textContent=ukupno?plPr(ukupno):'';
+ /* kartice kategorija (tabovi) */
+ let th='<button class="p-tab'+(aktivanFiltar==='sve'?' akt':'')+'" data-f="sve"><span class="br">'+ukupno+'</span>Sve</button>';
+ for(const k in KAT)th+='<button class="p-tab'+(aktivanFiltar===k?' akt':'')+'" data-f="'+k+'" title="'+KAT[k].ime+'"><span class="br"><span class="tocka" style="background:'+KAT[k].boja+'"></span>'+b[k]+'</span>'+KAT[k].ime+'</button>';
+ tabsEl.innerHTML=th;
+ tabsEl.querySelectorAll('.p-tab').forEach(t=>t.onclick=()=>{aktivanFiltar=t.dataset.f;otvorenaKartica=null;renderPanel();});
+ /* skupna akcija */
+ const sk=document.getElementById('skupno');
+ sk.style.display=b.tocnost>1?'block':'none';
+ sk.textContent='Prihvati sve prijedloge točnosti ('+b.tocnost+')';
+ /* widget */
+ widget.className='widget '+(ukupno?'gre':'ok');
+ widget.textContent=ukupno?ukupno:'✓';
+ widget.title=ukupno?plPr(ukupno):'Tekst je bez pogrešaka';
+ /* lista */
+ const vidljivi=issues.filter(i=>aktivanFiltar==='sve'||i.kat===aktivanFiltar);
+ if(ukupno===0){lista.innerHTML='<div class="p-prazno"><div class="krug-ok">✓</div><strong>tekst diše mirno.</strong><br>nismo pronašli nijednu pogrešku — nastavite pisati.</div>';return;}
+ if(!vidljivi.length){lista.innerHTML='<div class="p-prazno">U ovoj kategoriji trenutačno nema prijedloga.</div>';return;}
+ lista.innerHTML=vidljivi.map(i=>{
+  const jednaRijec=i.sug&&!/\s/.test(i.original);
+  return '<div class="kartica'+(otvorenaKartica===i.id?' otv':'')+'" data-id="'+i.id+'" tabindex="0">'+
+  '<div class="k-sazeto"><span class="traka" style="background:'+KAT[i.kat].boja+'"></span>'+
+  '<span class="tekst">'+(i.sug?'<span class="staro">'+esc(skrati(i.original))+'</span> <span class="novo">'+esc(i.sug)+'</span>':esc(skrati(i.original,40)))+'</span>'+
+  '<span class="vrsta">'+i.pod+'</span></div>'+
+  '<div class="k-detalj"><div class="obj">'+i.obj+'</div>'+
+  '<div class="akcije">'+(i.sug?'<button class="btn btn-zel" data-akc="prihvati">Prihvati</button>':'')+
+  '<button class="btn btn-obr" data-akc="zanemari">Odbaci</button>'+
+  (jednaRijec?'<button class="btn btn-tih" data-akc="rjecnik">+ Rječnik</button>':'')+'</div></div></div>';}).join('');
+ lista.querySelectorAll('.kartica').forEach(k=>{
+  const id=+k.dataset.id;
+  k.onclick=e=>{const a=e.target.dataset.akc;
+   if(a==='prihvati')return prihvati(id);
+   if(a==='zanemari')return zanemari(id);
+   if(a==='rjecnik')return uRjecnik(id);
+   otvorenaKartica=otvorenaKartica===id?null:id;renderPanel();
+   const mk=ed.querySelector('mark[data-id="'+id+'"]');
+   if(mk&&otvorenaKartica===id){mk.scrollIntoView&&mk.scrollIntoView({block:'center',behavior:'smooth'});bljesni(mk);}};});}
+const skrati=(t,n=24)=>t.length>n?t.slice(0,n-1)+'…':t;
+function bljesni(mk){ed.querySelectorAll('mark.fok').forEach(m=>m.classList.remove('fok'));mk.classList.add('fok');setTimeout(()=>mk.classList.remove('fok'),1600);}
+
+/* ---------- ocjena ---------- */
+function statistika(text){
+ const rijeci=text.trim()?text.trim().split(/\s+/).length:0;
+ const b={tocnost:0,jasnoca:0,zanimljivost:0,dojam:0};issues.forEach(i=>b[i.kat]++);
+ const broj=document.getElementById('ocjenaBroj'),prsten=document.getElementById('prsten');
+ if(!rijeci){broj.textContent='—';prsten.style.setProperty('--p',0);return;}
+ const oc=Math.max(12,100-6*b.tocnost-3*b.jasnoca-2*b.dojam);
+ broj.textContent=oc;prsten.style.setProperty('--p',oc);
+ document.getElementById('ocjenaLab').textContent='ocjena · '+rijeci+' r.';}
+
+/* ---------- prihvat / odbacivanje ---------- */
+function prihvati(id){const i=issues.find(x=>x.id===id);if(!i||!i.sug)return;
+ const t=getText(ed);
+ primijeniTekst(t.slice(0,i.start)+i.sug+t.slice(i.end),i.start+i.sug.length);zatvoriPop();}
+function zanemari(id){const i=issues.find(x=>x.id===id);if(!i)return;
+ ignorirano.add(i.kat+'|'+i.original.toLowerCase());zatvoriPop();analiziraj();
+ toast('u redu — ovo više nećemo predlagati u ovom dokumentu.');}
+function uRjecnik(id){const i=issues.find(x=>x.id===id);if(!i)return;
+ rjecnik.add(i.original.toLowerCase());zatvoriPop();analiziraj();
+ toast('»'+i.original+'« sada živi u vašem rječniku.');}
+function primijeniTekst(novi,caret){
+ issues=computeIssues(novi);renderEditor(novi);
+ if(caret!=null){ed.focus();setCaret(caret);}
+ otvorenaKartica=null;renderPanel();statistika(novi);lastSel=null;}
+document.getElementById('skupno').onclick=()=>{
+ const prije=getText(ed);let t=prije;
+ const pr=issues.filter(i=>i.kat==='tocnost'&&i.sug).sort((a,b)=>b.start-a.start);
+ pr.forEach(i=>t=t.slice(0,i.start)+i.sug+t.slice(i.end));
+ primijeniTekst(t);
+ toast('prihvaćeno '+pr.length+' ispravaka.',()=>primijeniTekst(prije));};
+
+/* ---------- popover ---------- */
+ed.addEventListener('click',e=>{const mk=e.target.closest('mark');if(mk)otvoriPop(+mk.dataset.id,mk);});
+function otvoriPop(id,mk){const i=issues.find(x=>x.id===id);if(!i)return;fokIdx=issues.indexOf(i);
+ zatvoriSelToolbar();
+ const jednaRijec=i.sug&&!/\s/.test(i.original);
+ pop.innerHTML='<div class="kat-red"><span class="tocka" style="background:'+KAT[i.kat].boja+'"></span>'+KAT[i.kat].ime+' <span class="pod">· '+i.pod+'</span></div>'+
+ (i.sug?'<div class="zamjena"><span class="staro">'+esc(skrati(i.original))+'</span> <span class="novo">'+esc(i.sug)+'</span></div>':'')+
+ '<div class="obj">'+i.obj+'</div>'+
+ '<div class="akcije">'+(i.sug?'<button class="btn btn-zel" onclick="prihvati('+id+')">Prihvati</button>':'')+
+ '<button class="btn btn-obr" onclick="zanemari('+id+')">Odbaci</button>'+
+ (jednaRijec?'<button class="btn btn-tih" title="Dodaj u osobni rječnik" onclick="uRjecnik('+id+')">+ Rječnik</button>':'')+'</div>'+
+ '<button class="btn btn-obr" style="width:100%;margin-top:8px" onclick="objasniNaJeziku('+id+')">🌍 objasni na mom jeziku</button>'+
+ '<div id="jezMostRez"></div>';
+ const wr=wrap.getBoundingClientRect(),r=mk.getBoundingClientRect();
+ pop.style.left=Math.max(8,Math.min(r.left-wr.left+wrap.scrollLeft,wrap.clientWidth-310))+'px';
+ pop.style.top=(r.bottom-wr.top+wrap.scrollTop+8)+'px';
+ pop.classList.add('vidljiv');wrap.appendChild(pop);bljesni(mk);}
+async function objasniNaJeziku(id){const i=issues.find(x=>x.id===id);if(!i)return;
+ const el=document.getElementById('jezMostRez');if(!el)return;
+ ucitavanje(el);
+ try{const odg=await claude('Hrvatska rečenica sadrži izraz: "'+i.original+'" → ispravak: "'+(i.sug||'(stilska napomena)')+'". Pravilo: '+i.obj+' Materinji jezik korisnika: '+materinjiJezik+'. Objasni GREŠKU tako da usporediš gramatičku strukturu materinjeg jezika ('+materinjiJezik+') i hrvatskog — imenuj konkretnu razliku (rod, padež, red riječi, član, glagolski vid…) zbog koje je greška nastala. Najviše 3 rečenice, piši na hrvatskom, jednostavno, bez žargona.');
+  el.innerHTML='<div class="ai-rezultat"><div class="oznaka">kroz '+esc(materinjiJezik)+'</div><div class="tekst">'+esc(odg)+'</div></div>';}
+ catch(e){aiGreska(el);}}
+function zatvoriPop(){pop.classList.remove('vidljiv');}
+document.addEventListener('click',e=>{if(!pop.contains(e.target)&&!e.target.closest('mark'))zatvoriPop();});
+document.addEventListener('keydown',e=>{
+ if(e.key==='Escape'){zatvoriPop();zatvoriSelToolbar();document.getElementById('ciljeviModal').classList.remove('vidljiv');zatvoriPanel();}
+ if((e.ctrlKey||e.metaKey)&&e.key==='.'){e.preventDefault();skociNaSljedeci();}});
+function skociNaSljedeci(){if(!issues.length)return;
+ fokIdx=(fokIdx+1)%issues.length;
+ const mk=ed.querySelector('mark[data-id="'+issues[fokIdx].id+'"]');
+ if(mk){mk.scrollIntoView&&mk.scrollIntoView({block:'center'});otvoriPop(issues[fokIdx].id,mk);}}
+const panelEl=document.getElementById('panel'),scrimEl=document.getElementById('scrim');
+function otvoriPanel(){panelEl.classList.add('otvoren');scrimEl.classList.add('vidljiv');}
+function zatvoriPanel(){panelEl.classList.remove('otvoren');scrimEl.classList.remove('vidljiv');}
+function preklopiPanel(){panelEl.classList.contains('otvoren')?zatvoriPanel():otvoriPanel();}
+scrimEl.addEventListener('click',zatvoriPanel);
+widget.onclick=()=>{if(matchMedia('(max-width:1020px)').matches)preklopiPanel();
+ else skociNaSljedeci();};
+
+/* ---------- toast ---------- */
+let toastT;
+function toast(txt,undo){const t=document.getElementById('toast'),a=document.getElementById('toastAkcija');
+ document.getElementById('toastTekst').textContent=txt;
+ a.style.display=undo?'block':'none';a.onclick=()=>{undo&&undo();t.classList.remove('vidljiv');};
+ t.classList.add('vidljiv');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('vidljiv'),4200);}
+
+/* ---------- panel kartice / AI prebacivanje ---------- */
+const aiGumb=document.getElementById('aiGumb');
+let aiOtvoren=false;
+function otvoriAi(){aiOtvoren=true;
+ document.getElementById('prijWrap').classList.add('skriven');
+ document.getElementById('aiPanel').classList.add('akt');
+ aiGumb.style.background='var(--zelena-100)';}
+aiGumb.onclick=()=>{aiOtvoren=!aiOtvoren;
+ document.getElementById('prijWrap').classList.toggle('skriven',aiOtvoren);
+ document.getElementById('aiPanel').classList.toggle('akt',aiOtvoren);
+ aiGumb.style.background=aiOtvoren?'var(--zelena-100)':'';};
+document.getElementById('tglPanel').onclick=preklopiPanel;
+/* poziva se s plutajuće trake na selekciji: otvara AI ploču i, na užim
+   zaslonima, cijelu bočnu ladicu — glavni dobitak za intuitivnost */
+function otvoriAiIzSelekcije(){otvoriAi();
+ if(matchMedia('(max-width:1020px)').matches)otvoriPanel();}
+
+/* ---------- modal Ciljevi ---------- */
+const cm=document.getElementById('ciljeviModal');
+function renderCiljevi(){cm.querySelectorAll('.seg').forEach(s=>{const c=s.dataset.c;
+ s.innerHTML=CILJ_OPCIJE[c].map(o=>'<button class="'+(ciljevi[c]===o?'akt':'')+'" data-o="'+o+'">'+o+'</button>').join('');
+ s.querySelectorAll('button').forEach(b=>b.onclick=()=>{ciljevi[c]=b.dataset.o;renderCiljevi();});});}
+document.getElementById('ciljeviBtn').onclick=()=>{renderCiljevi();cm.classList.add('vidljiv');};
+document.getElementById('ciljeviZatvori').onclick=()=>cm.classList.remove('vidljiv');
+document.getElementById('ciljeviSpremi').onclick=()=>{cm.classList.remove('vidljiv');toast('Ciljevi spremljeni — prijedlozi se prilagođavaju.');};
+cm.addEventListener('click',e=>{if(e.target===cm)cm.classList.remove('vidljiv');});
+
+/* ---------- AI sloj (Claude) ---------- */
+function aiIzvor(){const t=getText(ed);
+ if(lastSel&&lastSel.e<=t.length&&lastSel.e>lastSel.s)return{tekst:t.slice(lastSel.s,lastSel.e),s:lastSel.s,e:lastSel.e};
+ return{tekst:t.slice(0,1500),s:0,e:Math.min(t.length,1500)};}
+async function claude(upit){
+ const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',
+  headers:{'Content-Type':'application/json'},
+  body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,messages:[{role:'user',content:upit}]})});
+ const d=await r.json();
+ if(d.error)throw new Error(d.error.message||'Greška API-ja');
+ return d.content.filter(b=>b.type==='text').map(b=>b.text).join('\n').trim();}
+function ucitavanje(el){el.innerHTML='<div class="ucitava">Claude čita vaš tekst…</div>';}
+function aiGreska(el){el.innerHTML='<div class="ai-greska">Analizu trenutačno ne možemo dovršiti. Provjerite vezu i pokušajte ponovno.</div>';}
+function rezultat(el,stavke,izvor){
+ el.innerHTML=stavke.map((s,n)=>'<div class="ai-rezultat"><div class="oznaka">'+esc(s.oznaka)+'</div><div class="tekst">'+esc(s.tekst)+'</div>'+
+ '<button class="btn btn-zel" data-n="'+n+'">Primijeni</button></div>').join('');
+ el.querySelectorAll('button').forEach(b=>b.onclick=()=>{const t=getText(ed);
+  primijeniTekst(t.slice(0,izvor.s)+stavke[+b.dataset.n].tekst+t.slice(izvor.e));
+  toast('Primijenjeno.');});}
+async function aiPreoblikuj(){const el=document.getElementById('rezPreoblikuj'),iz=aiIzvor();
+ if(!iz.tekst.trim())return toast('Najprije napišite ili označite tekst.');
+ ucitavanje(el);
+ try{const odg=await claude('Preoblikuj sljedeći hrvatski tekst u TOČNO 3 varijante. Ciljevi teksta — '+ciljStr()+'. Odgovori ISKLJUČIVO valjanim JSON nizom bez ikakvog drugog teksta i bez Markdown ograda, oblika: [{"oznaka":"kraće","tekst":"..."},{"oznaka":"jasnije","tekst":"..."},{"oznaka":"formalnije","tekst":"..."}]. Tekst:\n\n'+iz.tekst);
+  rezultat(el,JSON.parse(odg.replace(/```json|```/g,'').trim()),iz);}catch(e){aiGreska(el);}}
+const TONOVI=['formalno','profesionalno','prijateljski','akademski','sažeto','uvjerljivo'];
+document.getElementById('tonovi').innerHTML=TONOVI.map(t=>'<button class="ton-cip" onclick="aiTon(\''+t+'\')">'+t+'</button>').join('');
+async function aiTon(ton){const el=document.getElementById('rezTon'),iz=aiIzvor();
+ if(!iz.tekst.trim())return toast('Najprije napišite ili označite tekst.');
+ ucitavanje(el);
+ try{const odg=await claude('Prepiši sljedeći hrvatski tekst u tonu: '+ton+'. Ciljevi teksta — '+ciljStr()+'. Zadrži značenje i duljinu približno istom. Odgovori ISKLJUČIVO prepisanim tekstom na hrvatskom, bez uvoda i komentara.\n\n'+iz.tekst);
+  rezultat(el,[{oznaka:'Ton: '+ton,tekst:odg}],iz);}catch(e){aiGreska(el);}}
+async function aiJasnoca(){const el=document.getElementById('rezJasnoca'),iz=aiIzvor();
+ if(!iz.tekst.trim())return toast('Najprije napišite ili označite tekst.');
+ ucitavanje(el);
+ try{const odg=await claude('Pojednostavni sljedeći hrvatski tekst: kraće rečenice, aktivni glagoli, bez pleonazama i administrativizama, bez gubitka značenja. Odgovori ISKLJUČIVO pojednostavljenim tekstom, bez komentara.\n\n'+iz.tekst);
+  rezultat(el,[{oznaka:'Jasnije',tekst:odg}],iz);}catch(e){aiGreska(el);}}
+async function aiDijalekt(){const el=document.getElementById('rezDijalekt'),iz=aiIzvor();
+ if(!iz.tekst.trim())return toast('Najprije napišite ili označite tekst.');
+ const d=document.getElementById('dijalekt').value;ucitavanje(el);
+ try{const odg=await claude('Pretvori sljedeći hrvatski standardni tekst u varijetet: '+d+'. Budi jezično autentičan (leksik, fonologija, morfologija toga varijeteta), ali zadrži značenje. Ako je varijetet starohrvatski, piši stilom glagoljaške pisane tradicije 12.–16. stoljeća latiničnom transliteracijom. Odgovori ISKLJUČIVO pretvorenim tekstom, bez komentara.\n\n'+iz.tekst);
+  rezultat(el,[{oznaka:d,tekst:odg}],iz);}catch(e){aiGreska(el);}}
+
+/* ---------- onboarding i probni tekst ---------- */
+const PROBNI=`Poštovani,
+
+neznam jesmo li dobro razumjeli vaš upit u vezi natječaja. Mi nebi htjeli propustiti rok ,a vremenski period za prijavu je vrlo kratak. Ukoliko trebate dodatne informacije, slobodno se javite sa pitanjima.
+
+molim vas da potvrdite primitak ovog dopisa. čak štoviše, bilo bi nam drago dogovoriti sastanak već idući tjedan. gdje idemo dalje s projektom ovisi o vašem odgovoru, no međutim sumljam da ćemo sve stići dogovoriti prije ljeta.
+
+Srdačan pozdrav,
+Marijo`;
+/* ---------- jezični most: materinji jezik kao kontekst za AI ---------- */
+const JEZICI=['bangla','ukrajinski','srpski','engleski','arapski','vijetnamski','ruski','poljski','njemački',
+ 'turski','perzijski (farsi)','somalijski','albanski','kineski (mandarinski)','hindski','urdu','filipinski (tagalog)',
+ 'pandžapski','nepalski','indonezijski'];
+let materinjiJezik=JEZICI[0];
+const obJezikEl=document.getElementById('obJezik');
+obJezikEl.innerHTML=JEZICI.map(j=>'<option value="'+j+'">'+j+'</option>').join('');
+obJezikEl.onchange=()=>{materinjiJezik=obJezikEl.value;osvjeziJezicniMost();};
+
+const OB=[
+ {n:'jezik pamti i kad vi zaboravite',t:'pravopis.io prati točnost, jasnoću i dojam vašeg teksta dok pišete — po pravilima hrvatskog jezika.',g:'započni'},
+ {n:'koji je vaš materinji jezik?',t:'greške objašnjavamo i kroz usporedbu s jezikom kojim već mislite — ne samo pravilom, nego razlogom.',g:'dalje',jezik:true},
+ {n:'svaki ispravak nosi razlog',t:'kliknite podcrtanu riječ ili karticu u ploči prijedloga — uz svaki prijedlog stoji objašnjenje, a ispravak prihvaćate jednim dodirom.',g:'dalje'},
+ {n:'ton se bira, ne nasljeđuje',t:'publika, formalnost i namjera oblikuju prijedloge. ai pomoćnik preoblikuje rečenice, mijenja ton — i vodi tekst u kajkavski, čakavski ili starohrvatski.',g:'otvori probni dokument'}];
+let obKorak=0;
+function obPrikazi(){const o=OB[obKorak];
+ document.getElementById('obNaslov').textContent=o.n;
+ document.getElementById('obTekst').textContent=o.t;
+ document.getElementById('obDalje').textContent=o.g;
+ obJezikEl.style.display=o.jezik?'block':'none';
+ if(o.jezik)obJezikEl.value=materinjiJezik;}
+function obKraj(){document.getElementById('onboarding').classList.remove('vidljiv');osvjeziJezicniMost();otvoriDash();}
+document.getElementById('obDalje').onclick=()=>{if(OB[obKorak].jezik)materinjiJezik=obJezikEl.value;
+ obKorak++;obKorak<OB.length?obPrikazi():obKraj();};
+document.getElementById('obPreskoci').onclick=obKraj;
+obPrikazi();
+
+/* demo paket vokabulara — kurirani hrvatski sadržaj; AI generira samo
+   objašnjenje kroz materinji jezik, na zahtjev, ne slobodno */
+const JM_POJMOVI=[
+ {hr:'prijava boravišta',obj:'obavezna registracija adrese stanovanja u zakonskom roku — MUP mora znati gdje živite.'},
+ {hr:'OIB (osobni identifikacijski broj)',obj:'jedinstveni broj koji vam treba za posao, banku, zdravstvo — gotovo sve.'},
+ {hr:'boravišna dozvola',obj:'dokument koji dokazuje da smijete zakonito boraviti u Hrvatskoj određeno vrijeme.'},
+ {hr:'zdravstveno osiguranje (HZZO)',obj:'pokriva liječničke troškove — bez njega plaćate punu cijenu pregleda.'},
+ {hr:'bruto / neto plaća',obj:'bruto je iznos prije poreza i doprinosa; neto je ono što stvarno dobijete na račun.'}];
+function osvjeziJezicniMost(){
+ const lab=document.getElementById('jmJezik');if(lab)lab.textContent=materinjiJezik;
+ const lista=document.getElementById('jmLista');if(!lista)return;
+ lista.innerHTML=JM_POJMOVI.map((p,n)=>
+  '<div class="jm-red"><div class="hr">'+esc(p.hr)+'</div><div class="obj-kratko">'+esc(p.obj)+'</div>'+
+  '<button onclick="objasniPojam('+n+')">objasni na '+esc(materinjiJezik)+'</button>'+
+  '<div id="jmRez'+n+'"></div></div>').join('');}
+async function objasniPojam(n){const p=JM_POJMOVI[n],el=document.getElementById('jmRez'+n);if(!el)return;
+ ucitavanje(el);
+ try{const odg=await claude('Hrvatski administrativni pojam: "'+p.hr+'" — znači: '+p.obj+' Korisnikov materinji jezik: '+materinjiJezik+'. Napiši kako se ovaj pojam ili najbliži ekvivalent kaže / objašnjava govorniku tog jezika, i jednu rečenicu konteksta specifičnu za taj jezik/kulturu ako je relevantno (npr. razlika u sustavu). Odgovori na hrvatskom, najviše 2 rečenice, bez uvoda.');
+  el.innerHTML='<div class="prijevod"><div class="oz">kroz '+esc(materinjiJezik)+'</div>'+esc(odg)+'</div>';}
+ catch(e){aiGreska(el);}}
+osvjeziJezicniMost();
+
+/* ---------- radna ploča i dokumenti ---------- */
+const EMAIL=`Poštovana gospođo Horvat,
+
+hvala na strpljenju. Nacrt ugovora šaljemo sutra ujutro ,a u vezi roka isporuke nebi mijenjali ništa. Ukoliko imate pitanja, slobodno se javite sa porukom.
+
+Lijep pozdrav,
+Marijo`;
+const SEMINAR=`U ovom radu analiziramo utjecaj umjetne inteligencije na obrazovanje. vremenski period istraživanja obuhvaća tri akademske godine, no međutim podaci za posljednju godinu još nisu potpuni. Sumljamo da će konačni rezultati potvrditi početnu hipotezu, ali uvjek je moguće i drukčije.`;
+let DOCS=[
+ {id:1,naslov:'Probni dokument',tekst:PROBNI,dat:'danas'},
+ {id:2,naslov:'E-mail klijentu',tekst:EMAIL,dat:'jučer'},
+ {id:3,naslov:'Seminar — uvod',tekst:SEMINAR,dat:'prije 3 dana'}];
+let trenutni=null;
+
+function ocjenaTeksta(t){if(!t.trim())return null;
+ const b={tocnost:0,jasnoca:0,zanimljivost:0,dojam:0};
+ computeIssues(t).forEach(i=>b[i.kat]++);
+ return Math.max(12,100-6*b.tocnost-3*b.jasnoca-2*b.dojam);}
+
+function renderDash(){
+ const g=document.getElementById('dashGrid');
+ g.innerHTML='<button class="dok dok-novi" id="dokNovi"><span class="plus">+</span>Novi dokument</button>'+
+ DOCS.map(d=>{const oc=ocjenaTeksta(d.tekst);
+  const cip=oc==null?'':'<span class="oc-cip '+(oc>=90?'oc-zel':oc>=70?'oc-zut':'oc-crv')+'">'+oc+'</span>';
+  const pr=d.tekst.trim()?esc(d.tekst.slice(0,300)):'prazan dokument';
+  return '<button class="dok" data-id="'+d.id+'">'+
+  '<span class="brisi" data-brisi="'+d.id+'" title="Izbriši dokument">✕</span>'+
+  '<span class="pregled'+(d.tekst.trim()?'':' prazan')+'">'+pr+'</span>'+
+  '<span class="meta"><span class="ime-d"><b>'+esc(d.naslov)+'</b><span>'+d.dat+'</span></span>'+cip+'</span></button>';}).join('');
+ g.querySelectorAll('.dok[data-id]').forEach(k=>k.onclick=e=>{
+  const bid=e.target.dataset&&e.target.dataset.brisi;
+  if(bid)return izbrisiDok(+bid);
+  otvoriDok(+k.dataset.id);});
+ document.getElementById('dokNovi').onclick=noviDok;}
+
+function otvoriDash(){spremiTrenutni();
+ document.getElementById('dash').classList.add('vidljiv');
+ document.body.classList.add('dash-aktivan');
+ zatvoriPanel();zatvoriPop();zatvoriSelToolbar();renderDash();}
+function spremiTrenutni(){if(!trenutni)return;
+ trenutni.tekst=getText(ed);trenutni.naslov=document.getElementById('naslov').value||'Dokument bez naslova';}
+function otvoriDok(id){const d=DOCS.find(x=>x.id===id);if(!d)return;
+ trenutni=d;
+ document.getElementById('naslov').value=d.naslov;
+ ignorirano=new Set();aktivanFiltar='sve';otvorenaKartica=null;fokIdx=-1;lastSel=null;
+ issues=computeIssues(d.tekst);renderEditor(d.tekst);renderPanel();statistika(d.tekst);
+ document.getElementById('dash').classList.remove('vidljiv');
+ document.body.classList.remove('dash-aktivan');
+ ed.focus();}
+function noviDok(){const d={id:Date.now(),naslov:'Dokument bez naslova',tekst:'',dat:'danas'};
+ DOCS.unshift(d);otvoriDok(d.id);
+ document.getElementById('naslov').focus();document.getElementById('naslov').select();}
+function izbrisiDok(id){const n=DOCS.findIndex(d=>d.id===id);if(n<0)return;
+ const[d]=DOCS.splice(n,1);renderDash();
+ toast('Dokument »'+d.naslov+'« izbrisan.',()=>{DOCS.splice(n,0,d);renderDash();});}
+document.querySelector('.natrag').onclick=otvoriDash;
+document.getElementById('dashNovi2').onclick=noviDok;
+</script>
+</body>
+</html>
