@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
 <title>Pravopis.io — pišite bolji hrvatski. u svom jeziku.</title>
 <meta name="description" content="AI asistent koji ispravlja hrvatski — i objašnjava svaku grešku na vašem jeziku. Za sve koji žive, rade ili uče u Hrvatskoj."/>
+<meta name="theme-color" content="#fcfcfc"/>
+<meta property="og:title" content="Pravopis.io — pišite bolji hrvatski. u svom jeziku."/>
+<meta property="og:description" content="Ispravite gramatiku, stil i dijalekt uz objašnjenja na vašem materinjem jeziku."/>
+<meta property="og:type" content="website"/>
+<meta property="og:url" content="https://pravopis-io.vercel.app/"/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=DM+Sans:ital,opsz,wght@0,9..40,700;0,9..40,800;1,9..40,700&display=swap" rel="stylesheet"/>
@@ -553,11 +558,11 @@ footer{
     </div>
 
     <div class="most-demo-jezici">
-      <button class="most-jez-btn akt" onclick="prikaziJezik('en')">English</button>
-      <button class="most-jez-btn" onclick="prikaziJezik('de')">Deutsch</button>
-      <button class="most-jez-btn" onclick="prikaziJezik('uk')">Українська</button>
-      <button class="most-jez-btn" onclick="prikaziJezik('ar')">العربية</button>
-      <button class="most-jez-btn" onclick="prikaziJezik('zh')">中文</button>
+      <button class="most-jez-btn akt" onclick="prikaziJezik('en', this)">English</button>
+      <button class="most-jez-btn" onclick="prikaziJezik('de', this)">Deutsch</button>
+      <button class="most-jez-btn" onclick="prikaziJezik('uk', this)">Українська</button>
+      <button class="most-jez-btn" onclick="prikaziJezik('ar', this)">العربية</button>
+      <button class="most-jez-btn" onclick="prikaziJezik('zh', this)">中文</button>
     </div>
 
     <div class="most-primjer">
@@ -699,7 +704,7 @@ footer{
     <h2 class="sec-naslov" style="text-align:center;">sve što vas zanima</h2>
     <div class="faq-lista">
       <div class="faq-item">
-        <button class="faq-pitanje" onclick="toggleFaq(this)">
+        <button class="faq-pitanje" onclick="toggleFaq(this)" aria-expanded="false">
           Trebam li znati hrvatski da bih koristio/la Pravopis.io?
           <span class="faq-ikona">+</span>
         </button>
@@ -708,7 +713,7 @@ footer{
         </div>
       </div>
       <div class="faq-item">
-        <button class="faq-pitanje" onclick="toggleFaq(this)">
+        <button class="faq-pitanje" onclick="toggleFaq(this)" aria-expanded="false">
           Koji jezici su podržani za objašnjenja?
           <span class="faq-ikona">+</span>
         </button>
@@ -717,7 +722,7 @@ footer{
         </div>
       </div>
       <div class="faq-item">
-        <button class="faq-pitanje" onclick="toggleFaq(this)">
+        <button class="faq-pitanje" onclick="toggleFaq(this)" aria-expanded="false">
           Kako funkcionira Jezični Most za dijalekte?
           <span class="faq-ikona">+</span>
         </button>
@@ -726,7 +731,7 @@ footer{
         </div>
       </div>
       <div class="faq-item">
-        <button class="faq-pitanje" onclick="toggleFaq(this)">
+        <button class="faq-pitanje" onclick="toggleFaq(this)" aria-expanded="false">
           Je li Pravopis.io samo za strance?
           <span class="faq-ikona">+</span>
         </button>
@@ -735,7 +740,7 @@ footer{
         </div>
       </div>
       <div class="faq-item">
-        <button class="faq-pitanje" onclick="toggleFaq(this)">
+        <button class="faq-pitanje" onclick="toggleFaq(this)" aria-expanded="false">
           Kako je Pravopis.io drugačiji od ispravi.me ili alata poput Grammarly?
           <span class="faq-ikona">+</span>
         </button>
@@ -809,21 +814,27 @@ const objasnjenja = {
   }
 };
 
-function prikaziJezik(lang) {
+function prikaziJezik(lang, button) {
   const obj = objasnjenja[lang];
   document.getElementById('most-lang-label').textContent = obj.lbl;
   document.getElementById('most-prijevod').textContent = obj.prijevod;
   document.getElementById('most-original').textContent = obj.original;
   document.querySelectorAll('.most-jez-btn').forEach(b => b.classList.remove('akt'));
-  event.target.classList.add('akt');
+  button.classList.add('akt');
 }
 
 // FAQ
 function toggleFaq(btn) {
   const item = btn.closest('.faq-item');
   const jeAkt = item.classList.contains('akt');
-  document.querySelectorAll('.faq-item').forEach(i => i.classList.remove('akt'));
-  if (!jeAkt) item.classList.add('akt');
+  document.querySelectorAll('.faq-item').forEach(i => {
+    i.classList.remove('akt');
+    i.querySelector('.faq-pitanje').setAttribute('aria-expanded', 'false');
+  });
+  if (!jeAkt) {
+    item.classList.add('akt');
+    btn.setAttribute('aria-expanded', 'true');
+  }
 }
 
 // Intersection Observer za animacije
