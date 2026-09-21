@@ -12,7 +12,7 @@ export default function Pocetna() {
   return (
     <main className="landing">
       <nav className="landing-nav" aria-label="Glavna navigacija">
-        <Link href="/" className="wordmark">pravopis<span>.io</span></Link>
+        <Link href="/" className="wordmark" aria-label="pravopis.io početna"><img src="/pravopis-io-logo.svg" alt="pravopis.io" /></Link>
         <div className="landing-nav-links">
           <a href="#kako-radi">Kako radi</a>
           <a href="#cijene">Cijene</a>
@@ -55,7 +55,7 @@ export default function Pocetna() {
         <div className="price-card"><p className="price-kicker">OSNOVNI PLAN</p><p className="price"><strong>0 €</strong> / zauvijek</p><p>Za svakodnevno pisanje bez kompliciranja.</p><Link href="/prijava" className="button button-dark full">Krenite odmah <span>↗</span></Link></div>
       </section>
 
-      <footer><Link href="/" className="wordmark">pravopis<span>.io</span></Link><p>Pišite bolje. U svom jeziku.</p><p>© 2026 Pravopis.io</p></footer>
+      <footer><Link href="/" className="wordmark" aria-label="pravopis.io početna"><img src="/pravopis-io-logo.svg" alt="pravopis.io" /></Link><p>Pišite bolje. U svom jeziku.</p><p>© 2026 Pravopis.io</p></footer>
     </main>
   );
 }
